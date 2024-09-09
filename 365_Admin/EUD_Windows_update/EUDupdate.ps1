@@ -1,4 +1,6 @@
  # This script will update a Windows machine with all the available security patches.
+ # Ensure it can be executued 
+ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
  # Ensure the script is run as an administrator
 function Check-Administrator {
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
