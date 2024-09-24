@@ -1,12 +1,35 @@
 # Dynamically get the current username and the user's profile directory
 $directory = "$env:USERPROFILE"
 $cutoffDate = Get-Date "2024-05-05"
-$items = Get-ChildItem -Path $directory -Recurse
-
-# List of important folders to recreate
 $foldersToCreate = @("Desktop", "Documents", "Downloads")
 
-# First, loop through files and delete those modified after the cutoff date
+# Function to forcefully clear the contents of a folder, including subfolders
+function Clear-Folder {
+    param(
+        [string]$path
+    )
+    
+    if (Test-Path $path) {
+        try {
+            # Use Remove-Item with -Recurse and -Force to remove everything inside the folder
+            Get-ChildItem -Path $path -Recurse | ForEach-Object {
+                try {
+                    Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop
+                    Write-Host "Deleted: $($_.FullName)" -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "Failed to delete: $($_.FullName)" -ForegroundColor Red
+                }
+            }
+        }
+        catch {
+            Write-Host "Failed to clear folder: $path" -ForegroundColor Red
+        }
+    }
+}
+
+# First, delete all files modified after the cutoff date
+$items = Get-ChildItem -Path $directory -Recurse
 foreach ($item in $items) {
     $lastWriteTime = $item.LastWriteTime
 
@@ -22,28 +45,15 @@ foreach ($item in $items) {
     }
 }
 
-# Next, ensure subdirectories inside the target folders are removed
+# Clear out the important folders (Desktop, Documents, Downloads)
 foreach ($folder in $foldersToCreate) {
     $folderPath = Join-Path -Path $directory -ChildPath $folder
 
-    if (Test-Path -Path $folderPath) {
-        # Get all items (files and directories) within the folder
-        $folderItems = Get-ChildItem -Path $folderPath -Recurse
-
-        # Remove all items within the folder
-        foreach ($item in $folderItems) {
-            try {
-                Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction Stop
-                Write-Host "Deleted: $($item.FullName)" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Failed to delete: $($item.FullName)" -ForegroundColor Red
-            }
-        }
-    }
+    # Call the function to clear the folder's contents
+    Clear-Folder -path $folderPath
 }
 
-# Finally, recreate important folders if they are missing
+# Recreate important folders if they are missing
 foreach ($folder in $foldersToCreate) {
     $folderPath = Join-Path -Path $directory -ChildPath $folder
 
