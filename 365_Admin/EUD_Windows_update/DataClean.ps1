@@ -1,4 +1,5 @@
-$directory = "C:\Users\YourUsername"
+# Dynamically get the current username and the user's profile directory
+$directory = "$env:USERPROFILE"
 $cutoffDate = Get-Date "2024-05-05"
 $items = Get-ChildItem -Path $directory -Recurse
 
