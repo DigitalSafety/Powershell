@@ -16,28 +16,6 @@ function Check-Administrator {
     }
 }
 
-# Function to manage and clean user folders
-function Manage-FoldersAndFiles {
-    $foldersToCreate = @("Desktop", "Documents", "Downloads")
-    $directory = "$env:USERPROFILE"
-
-    foreach ($folder in $foldersToCreate) {
-        $folderPath = Join-Path -Path $directory -ChildPath $folder
-        Clear-Folder -path $folderPath
-        if (-not (Test-Path -Path $folderPath)) {
-            try {
-                New-Item -Path $folderPath -ItemType Directory
-                Write-Host "Recreated folder: $folderPath" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Failed to recreate folder: $folderPath" -ForegroundColor Red
-            }
-        } else {
-            Write-Host "Folder already exists: $folderPath" -ForegroundColor Yellow
-        }
-    }
-}
-
 # Function to forcefully clear the contents of a folder, including subfolders
 function Clear-Folder {
     param(
@@ -58,6 +36,28 @@ function Clear-Folder {
         }
         catch {
             Write-Host "Failed to clear folder: $path" -ForegroundColor Red
+        }
+    }
+}
+
+# Function to manage and clean user folders
+function Manage-FoldersAndFiles {
+    $foldersToCreate = @("Desktop", "Documents", "Downloads")
+    $directory = "$env:USERPROFILE"
+
+    foreach ($folder in $foldersToCreate) {
+        $folderPath = Join-Path -Path $directory -ChildPath $folder
+        Clear-Folder -path $folderPath
+        if (-not (Test-Path -Path $folderPath)) {
+            try {
+                New-Item -Path $folderPath -ItemType Directory
+                Write-Host "Recreated folder: $folderPath" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Failed to recreate folder: $folderPath" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "Folder already exists: $folderPath" -ForegroundColor Yellow
         }
     }
 }
