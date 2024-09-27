@@ -16,6 +16,28 @@ function Check-Administrator {
     }
 }
 
+# Function to manage and clean user folders
+function Manage-FoldersAndFiles {
+    $foldersToCreate = @("Desktop", "Documents", "Downloads")
+    $directory = "$env:USERPROFILE"
+
+    foreach ($folder in $foldersToCreate) {
+        $folderPath = Join-Path -Path $directory -ChildPath $folder
+        Clear-Folder -path $folderPath
+        if (-not (Test-Path -Path $folderPath)) {
+            try {
+                New-Item -Path $folderPath -ItemType Directory
+                Write-Host "Recreated folder: $folderPath" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Failed to recreate folder: $folderPath" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "Folder already exists: $folderPath" -ForegroundColor Yellow
+        }
+    }
+}
+
 # Function to forcefully clear the contents of a folder, including subfolders
 function Clear-Folder {
     param(
@@ -24,7 +46,6 @@ function Clear-Folder {
     
     if (Test-Path $path) {
         try {
-            # Use Remove-Item with -Recurse and -Force to remove everything inside the folder and auto-confirm
             Get-ChildItem -Path $path -Recurse | ForEach-Object {
                 try {
                     Remove-Item -LiteralPath $_.FullName -Recurse -Force -Confirm:$false -ErrorAction Stop
@@ -167,7 +188,7 @@ function Check-Updates {
     }
 }
 
-# Function to install updates
+# Function to install updates (removed ambiguous -Force)
 function Install-Updates {
     param (
         [Parameter(Mandatory=$true)]
@@ -177,7 +198,7 @@ function Install-Updates {
     if ($updates) {
         try {
             Write-Output "Installing updates..."
-            $results = Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot:$false -Force
+            $results = Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -ForceInstall
             Write-Output "Updates installation results:"
             $results | Format-Table -AutoSize
             return $results
@@ -230,4 +251,3 @@ $updateResults = Install-Updates -updates $updates
 Restart-ComputerIfNecessary -updateResults $updateResults
 
 Write-Output "Script completed successfully."
-
