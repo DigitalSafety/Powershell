@@ -8,119 +8,107 @@ function Check-Administrator {
     }
 }
 
-# Function to remove non-system programs installed after a specific date
+# Function to remove non-essential programs installed in the last 30 days
 function Remove-NewPrograms {
     param (
-        [DateTime]$cutoffDate
+        [int]$daysAgo = 30
     )
 
-    Write-Host "Removing newly installed programs since $cutoffDate..."
+    Write-Host "Removing non-essential programs installed in the last $daysAgo days..."
 
-    # Define program directories (non-system)
-    $programDirs = @(
-        "C:\Program Files\Custom Programs",  # Non-system directory (adjust accordingly)
-        "C:\Program Files (x86)\Custom Programs"  # Non-system directory (adjust accordingly)
+    # Get all installed programs
+    $cutoffDate = (Get-Date).AddDays(-$daysAgo)
+
+    # Paths to check for installed programs
+    $programPaths = @(
+        "C:\Program Files",
+        "C:\Program Files (x86)"
     )
 
-    foreach ($path in $programDirs) {
-        try {
-            Get-ChildItem -Path $path -Recurse -Directory -ErrorAction SilentlyContinue | Where-Object { 
-                $_.CreationTime -gt $cutoffDate
-            } | ForEach-Object {
-                Write-Host "Removing program: $($_.FullName)"
+    foreach ($path in $programPaths) {
+        Get-ChildItem -Path $path -Directory | ForEach-Object {
+            if ($_.LastWriteTime -gt $cutoffDate) {
+                # Try to remove the program, but skip system-protected ones
                 try {
                     Remove-Item -Recurse -Force -Path $_.FullName -ErrorAction Stop
                     Write-Host "Removed: $($_.FullName)" -ForegroundColor Green
                 } catch {
-                    Write-Host "Failed to remove: $($_.FullName). The program might be locked." -ForegroundColor Red
+                    Write-Host "Failed to remove: $($_.FullName). It might be protected or in use." -ForegroundColor Red
                 }
             }
-        } catch {
-            Write-Host "Failed to get directory listing for: $path" -ForegroundColor Red
         }
     }
-
     Write-Host "Program removal completed."
 }
 
-# Function to clear user-specific data from AppData\Local
-function Clear-LocalAppData {
+# Function to clear old user files older than 30 days
+function Clear-OldUserFiles {
     param (
-        [string]$username
+        [int]$daysOld = 30
     )
 
-    $appDataPath = "C:\Users\$username\AppData\Local"
-    Write-Host "Clearing data from AppData\Local for user: $username"
+    Write-Host "Clearing old user files older than $daysOld days..."
 
-    $excludeDirs = @("Microsoft", "Temp", "Packages", "ConnectedDevicesPlatform")  # Exclude system/important directories
+    $foldersToClean = @("Documents", "Downloads", "Pictures")
+    $cutoffDate = (Get-Date).AddDays(-$daysOld)
 
-    Get-ChildItem -Path $appDataPath -Directory | Where-Object { $_.Name -notin $excludeDirs } | ForEach-Object {
-        try {
-            Remove-Item -Recurse -Force -Path $_.FullName
-            Write-Host "Cleared: $($_.FullName)" -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to clear: $($_.FullName). File might be in use or locked." -ForegroundColor Red
+    # Loop through all user profiles
+    Get-ChildItem "C:\Users" | ForEach-Object {
+        $userProfile = $_.FullName
+
+        foreach ($folder in $foldersToClean) {
+            $userFolder = "$userProfile\$folder"
+            if (Test-Path $userFolder) {
+                Get-ChildItem -Path $userFolder -Recurse | Where-Object { $_.LastWriteTime -lt $cutoffDate } | ForEach-Object {
+                    try {
+                        Remove-Item -Recurse -Force -Path $_.FullName
+                        Write-Host "Deleted: $($_.FullName)" -ForegroundColor Green
+                    } catch {
+                        Write-Host "Failed to delete: $($_.FullName). It might be in use or protected." -ForegroundColor Red
+                    }
+                }
+            }
         }
     }
-
-    Write-Host "AppData\Local cleanup complete for user: $username"
+    Write-Host "Old user files cleared."
 }
 
-# Function to clear browser data for specific browsers
-function Clear-BrowserData {
-    Write-Host "Clearing browser data..."
+# Function to reset Microsoft Edge data for all users
+function Reset-EdgeData {
+    Write-Host "Resetting Microsoft Edge data for all users..."
 
-    # Edge
-    $edgeCache = "C:\Users\$env:USERNAME\AppData\Local\Microsoft\Edge\User Data\Default\Cache"
-    if (Test-Path -Path $edgeCache) {
-        try {
-            Remove-Item -Recurse -Force -Path $edgeCache
-            Write-Host "Cleared data for Edge." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to clear data for Edge: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "Edge data not found."
+    # Ensure Edge is not running
+    $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
+    if ($edgeProcesses) {
+        Write-Host "Stopping Microsoft Edge processes..."
+        Stop-Process -Name "msedge" -Force
+        Write-Host "Microsoft Edge processes stopped."
     }
 
-    # Chrome
-    $chromeCache = "C:\Users\$env:USERNAME\AppData\Local\Google\Chrome\User Data\Default\Cache"
-    if (Test-Path -Path $chromeCache) {
-        try {
-            Remove-Item -Recurse -Force -Path $chromeCache
-            Write-Host "Cleared data for Chrome." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to clear data for Chrome: $_" -ForegroundColor Red
+    Get-ChildItem "C:\Users" | ForEach-Object {
+        $userProfile = $_.FullName
+        $edgeDataPath = "$userProfile\AppData\Local\Microsoft\Edge\User Data\Default"
+
+        if (Test-Path $edgeDataPath) {
+            $filesToClear = @("History", "Cache", "Cookies", "Top Sites", "Preferences", "Visited Links", "Sessions")
+
+            foreach ($file in $filesToClear) {
+                $filePath = "$edgeDataPath\$file"
+                if (Test-Path $filePath) {
+                    try {
+                        Remove-Item -Recurse -Force -Path $filePath -ErrorAction Stop
+                        Write-Host "Cleared: $filePath" -ForegroundColor Green
+                    } catch {
+                        Write-Host "Failed to clear: $filePath. File may be locked or in use." -ForegroundColor Red
+                    }
+                } else {
+                    Write-Host "Path not found: $filePath" -ForegroundColor Yellow
+                }
+            }
         }
-    } else {
-        Write-Host "Chrome not found."
     }
 
-    # Firefox
-    $firefoxProfile = "C:\Users\$env:USERNAME\AppData\Roaming\Mozilla\Firefox\Profiles"
-    if (Test-Path -Path $firefoxProfile) {
-        try {
-            Remove-Item -Recurse -Force -Path $firefoxProfile
-            Write-Host "Cleared data for Firefox." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to clear data for Firefox: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "Firefox not found."
-    }
-
-    # Brave
-    $braveCache = "C:\Users\$env:USERNAME\AppData\Local\BraveSoftware\Brave-Browser\User Data\Default\Cache"
-    if (Test-Path -Path $braveCache) {
-        try {
-            Remove-Item -Recurse -Force -Path $braveCache
-            Write-Host "Cleared data for Brave." -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to clear data for Brave: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "Brave not found."
-    }
+    Write-Host "Microsoft Edge reset completed."
 }
 
 # Function to empty the Recycle Bin
@@ -136,44 +124,22 @@ function Empty-RecycleBin {
 
 # Function to install Windows updates
 function Install-WindowsUpdates {
-    Write-Host "PSWindowsUpdate module is already installed."
-    Write-Host "Importing PSWindowsUpdate module..."
+    Write-Host "Installing Windows updates..."
     try {
-        Import-Module PSWindowsUpdate
-        Write-Host "PSWindowsUpdate module imported."
+        Import-Module PSWindowsUpdate -ErrorAction Stop
+        Get-WindowsUpdate -MicrosoftUpdate -AcceptAll -Install -AutoReboot
+        Write-Host "Windows updates installed successfully." -ForegroundColor Green
     } catch {
-        Write-Host "Failed to import PSWindowsUpdate module: $_" -ForegroundColor Red
-    }
-
-    Write-Host "Checking for updates..."
-    $updates = Get-WindowsUpdate -MicrosoftUpdate -AcceptAll
-    if ($updates) {
-        Write-Host "Installing updates..."
-        $updateResults = Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot:$false
-        Write-Host "Updates installed."
-    } else {
-        Write-Host "No updates found."
+        Write-Host "Failed to install Windows updates: $_" -ForegroundColor Red
     }
 }
 
 # Main script logic
 Check-Administrator
-
-# Remove newly installed non-system programs
-$cutoffDate = (Get-Date).AddMonths(-6)
-Remove-NewPrograms -cutoffDate $cutoffDate
-
-# Clear AppData\Local for specific users
-Clear-LocalAppData -username "admin"
-Clear-LocalAppData -username "vagrant"
-
-# Clear browser data
-Clear-BrowserData
-
-# Empty the Recycle Bin
+Remove-NewPrograms -daysAgo 30
+Clear-OldUserFiles -daysOld 30
+Reset-EdgeData
 Empty-RecycleBin
-
-# Install Windows Updates
 Install-WindowsUpdates
 
 Write-Host "Script completed successfully."
