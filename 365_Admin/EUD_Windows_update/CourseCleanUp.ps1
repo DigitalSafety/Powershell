@@ -1,4 +1,4 @@
-cou# Ensure the script is run as an administrator
+# Ensure the script is run as an administrator
 function Check-Administrator {
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Warning "You do not have Administrator rights to run this script! Please run as an Administrator."
