@@ -1,4 +1,4 @@
-# Function to check if the script is run as Administrator
+# Ensure the script is run as an Administrator
 function Check-Administrator {
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Warning "You do not have Administrator rights to run this script! Please run as an Administrator."
@@ -10,7 +10,7 @@ function Check-Administrator {
 
 # Function to detect the original (non-elevated) user account that ran the script
 function Get-OriginalUserProfile {
-    # Use the query to get the original user session info
+    # Use WMI to get the original user session info
     $sessions = Get-WmiObject -Class Win32_ComputerSystem
     $originalUser = $sessions.UserName
 
@@ -183,4 +183,44 @@ function Empty-RecycleBin {
         Clear-RecycleBin -Force
         Write-Host "Recycle Bin emptied." -ForegroundColor Green
     } catch {
-        Write
+        Write-Host "Failed to empty the Recycle Bin: $_" -ForegroundColor Red
+    }
+}
+
+# Function to install Windows updates
+function Install-WindowsUpdates {
+    Write-Host "Installing Windows updates..."
+    try {
+        Import-Module PSWindowsUpdate -ErrorAction Stop
+        Get-WindowsUpdate -MicrosoftUpdate -AcceptAll -Install -AutoReboot
+        Write-Host "Windows updates installed successfully." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to install Windows updates: $_" -ForegroundColor Red
+    }
+}
+
+# Main script logic
+# Ensure the script is being run as an administrator
+Check-Administrator
+
+# Clear Microsoft Edge data for the original user (the one who ran the script)
+Clear-EdgeData
+
+# Delete old files from Downloads, Documents, and Desktop for the original user
+Clear-OldUserFiles -daysOld 30
+
+# Optionally, empty the Recycle Bin
+Empty-RecycleBin
+
+# Optionally, install Windows updates
+Install-WindowsUpdates
+
+Write-Host "Script completed successfully."
+
+# Add a 10-second pause before reboot
+Write-Host "The system will restart in 10 seconds..."
+Start-Sleep -Seconds 10
+
+# Add a forced reboot
+Write-Host "Forcing system reboot..."
+Restart-Computer -Force
