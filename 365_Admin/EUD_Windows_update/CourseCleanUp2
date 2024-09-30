@@ -140,6 +140,42 @@ function Clear-EdgeData {
     }
 }
 
+# Function to delete files older than 30 days in the Downloads, Documents, and Desktop folders
+function Clear-OldUserFiles {
+    param (
+        [int]$daysOld = 30
+    )
+
+    Write-Host "Clearing user files older than $daysOld days..."
+
+    # Get the original user's profile path
+    $userProfilePath = Get-OriginalUserProfile
+
+    # Define the folders to clean (Downloads, Documents, Desktop)
+    $foldersToClean = @("Downloads", "Documents", "Desktop")
+    $cutoffDate = (Get-Date).AddDays(-$daysOld)
+
+    foreach ($folder in $foldersToClean) {
+        $userFolder = "$userProfilePath\$folder"
+        if (Test-Path $userFolder) {
+            Get-ChildItem -Path $userFolder -Recurse | Where-Object {
+                $_.LastWriteTime -lt $cutoffDate
+            } | ForEach-Object {
+                try {
+                    Remove-Item -Recurse -Force -Path $_.FullName
+                    Write-Host "Deleted: $($_.FullName)" -ForegroundColor Green
+                } catch {
+                    Write-Host "Failed to delete: $($_.FullName). It might be in use or protected." -ForegroundColor Red
+                }
+            }
+        } else {
+            Write-Host "Folder not found: $userFolder" -ForegroundColor Yellow
+        }
+    }
+
+    Write-Host "Old user files cleared."
+}
+
 # Function to empty the Recycle Bin
 function Empty-RecycleBin {
     Write-Host "Emptying the Recycle Bin..."
@@ -147,42 +183,4 @@ function Empty-RecycleBin {
         Clear-RecycleBin -Force
         Write-Host "Recycle Bin emptied." -ForegroundColor Green
     } catch {
-        Write-Host "Failed to empty the Recycle Bin: $_" -ForegroundColor Red
-    }
-}
-
-# Function to install Windows updates
-function Install-WindowsUpdates {
-    Write-Host "Installing Windows updates..."
-    try {
-        Import-Module PSWindowsUpdate -ErrorAction Stop
-        Get-WindowsUpdate -MicrosoftUpdate -AcceptAll -Install -AutoReboot
-        Write-Host "Windows updates installed successfully." -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to install Windows updates: $_" -ForegroundColor Red
-    }
-}
-
-# Main script logic
-# Ensure the script is being run as an administrator
-Check-Administrator
-
-# Clear Microsoft Edge data for the original user (the one who ran the script)
-Clear-EdgeData
-
-# Optionally, run other cleanup tasks
-# For example, empty the Recycle Bin
-Empty-RecycleBin
-
-# Optionally, install Windows updates
-Install-WindowsUpdates
-
-Write-Host "Script completed successfully."
-
-# Add a 10-second pause before reboot
-Write-Host "The system will restart in 10 seconds..."
-Start-Sleep -Seconds 10
-
-# Add a forced reboot
-Write-Host "Forcing system reboot..."
-Restart-Computer -Force
+        Write
