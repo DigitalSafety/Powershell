@@ -1,4 +1,4 @@
-# Ensure the script is run as an administrator
+cou# Ensure the script is run as an administrator
 function Check-Administrator {
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-Warning "You do not have Administrator rights to run this script! Please run as an Administrator."
@@ -139,7 +139,7 @@ function Remove-NewPrograms {
     Write-Host "Removing non-essential programs installed in the last $daysAgo days..."
 
     # Get the full path of the script to avoid deleting it
-    $scriptPath = "C:\Program Files\CourseCleanUp.ps1"
+    $scriptPath = "C:\Program Files\CourseCleanup\CourseCleanUp.ps1"
 
     # Get the cutoff date for the past X days
     $cutoffDate = (Get-Date).AddDays(-$daysAgo)
@@ -179,7 +179,7 @@ function Clear-OldUserFiles {
 
     Write-Host "Clearing old user files older than $daysOld days..."
 
-    $foldersToClean = @("Documents", "Downloads", "Pictures")
+    $foldersToClean = @("Documents", "Downloads", "Pictures", "Desktop")
     $cutoffDate = (Get-Date).AddDays(-$daysOld)
 
     # Loop through all user profiles
@@ -189,7 +189,9 @@ function Clear-OldUserFiles {
         foreach ($folder in $foldersToClean) {
             $userFolder = "$userProfile\$folder"
             if (Test-Path $userFolder) {
-                Get-ChildItem -Path $userFolder -Recurse | Where-Object { $_.LastWriteTime -lt $cutoffDate } | ForEach-Object {
+                Get-ChildItem -Path $userFolder -Recurse | Where-Object {
+                    $_.LastWriteTime -lt $cutoffDate -and ($folder -ne 'Desktop' -or $_.Extension -ne '.lnk')
+                } | ForEach-Object {
                     try {
                         Remove-Item -Recurse -Force -Path $_.FullName
                         Write-Host "Deleted: $($_.FullName)" -ForegroundColor Green
@@ -200,8 +202,10 @@ function Clear-OldUserFiles {
             }
         }
     }
+
     Write-Host "Old user files cleared."
 }
+
 
 
 
