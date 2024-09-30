@@ -16,7 +16,10 @@ function Remove-NewPrograms {
 
     Write-Host "Removing non-essential programs installed in the last $daysAgo days..."
 
-    # Get all installed programs
+    # Get the full path of the script to avoid deleting it
+    $scriptPath = "C:\Program Files\CourseCleanUp.ps1"
+
+    # Get the cutoff date for the past X days
     $cutoffDate = (Get-Date).AddDays(-$daysAgo)
 
     # Paths to check for installed programs
@@ -27,9 +30,12 @@ function Remove-NewPrograms {
 
     foreach ($path in $programPaths) {
         Get-ChildItem -Path $path -Directory | ForEach-Object {
-            if ($_.LastWriteTime -gt $cutoffDate) {
-                # Try to remove the program, but skip system-protected ones
+            # Skip the directory if it contains CourseCleanUp.ps1
+            if ($_.FullName -eq "C:\Program Files" -and (Test-Path $scriptPath)) {
+                Write-Host "Skipping: $($_.FullName) because it contains CourseCleanUp.ps1" -ForegroundColor Yellow
+            } elseif ($_.LastWriteTime -gt $cutoffDate) {
                 try {
+                    # Try to remove the directory, ignoring protected and in-use ones
                     Remove-Item -Recurse -Force -Path $_.FullName -ErrorAction Stop
                     Write-Host "Removed: $($_.FullName)" -ForegroundColor Green
                 } catch {
@@ -38,8 +44,10 @@ function Remove-NewPrograms {
             }
         }
     }
+
     Write-Host "Program removal completed."
 }
+
 
 # Function to clear old user files older than 30 days
 function Clear-OldUserFiles {
