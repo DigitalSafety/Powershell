@@ -4,7 +4,7 @@ function Check-Administrator {
         Write-Warning "You do not have Administrator rights to run this script! Please run as an Administrator."
         Exit
     } else {
-        Write-Host "Administrator check passed."
+        Write-Host "Administrator check passed." -ForegroundColor Cyan
     }
 }
 
@@ -15,26 +15,31 @@ function Get-OriginalUserProfile {
     $originalUser = $sessions.UserName
 
     if (-not $originalUser) {
-        Write-Warning "Unable to determine the original user account. Exiting..."
+        Write-Warning "Unable to determine the original user account. Exiting..." -ForegroundColor Red
         Exit
     }
 
     $userProfilePath = "C:\Users\$($originalUser.Split('\')[1])"  # Extract the username and build the profile path
+    Write-Host "Detected original user profile path: $userProfilePath" -ForegroundColor Cyan
     return $userProfilePath
 }
 
 # Function to stop all Edge and related services
 function Close-EdgeProcesses {
-    Write-Host "Closing Microsoft Edge and related processes..."
+    Write-Host "Closing Microsoft Edge and related processes..." -ForegroundColor Cyan
     
     # Stop all Edge and Edge-related processes (including msedgewebview2)
     $edgeProcesses = Get-Process | Where-Object {
         $_.ProcessName -like "*msedge*" -or $_.ProcessName -like "*edge*" -or $_.ProcessName -like "*msedgewebview2*"
     }
 
+    if ($edgeProcesses.Count -eq 0) {
+        Write-Host "No Edge processes found. Proceeding to file deletion..." -ForegroundColor Cyan
+    }
+
     foreach ($process in $edgeProcesses) {
         try {
-            Write-Host "Stopping process: $($process.ProcessName) (ID: $($process.Id))"
+            Write-Host "Stopping process: $($process.ProcessName) (ID: $($process.Id))" -ForegroundColor Cyan
             Stop-Process -Id $process.Id -Force
         } catch {
             Write-Host "Failed to stop process: $($process.ProcessName)" -ForegroundColor Red
@@ -51,7 +56,7 @@ function Schedule-DeleteOnReboot {
         [string]$filePath
     )
     
-    Write-Host "Scheduling deletion of $filePath on reboot..."
+    Write-Host "Scheduling deletion of $filePath on reboot..." -ForegroundColor Yellow
 
     try {
         $signature = @"
@@ -74,7 +79,7 @@ function Schedule-DeleteOnReboot {
 
 # Function to clear Microsoft Edge history, cache, session, and favorites for the original user
 function Clear-EdgeData {
-    Write-Host "Clearing Microsoft Edge history, cache, session files, and favorites for the original user..."
+    Write-Host "Clearing Microsoft Edge history, cache, session files, and favorites for the original user..." -ForegroundColor Cyan
 
     # Get the original user's profile path
     $userProfilePath = Get-OriginalUserProfile
@@ -97,7 +102,7 @@ function Clear-EdgeData {
             Schedule-DeleteOnReboot -filePath $edgeHistoryPath
         }
     } else {
-        Write-Host "History file not found: $edgeHistoryPath"
+        Write-Host "History file not found: $edgeHistoryPath" -ForegroundColor Yellow
     }
 
     # Remove Edge cache
@@ -110,7 +115,7 @@ function Clear-EdgeData {
             Schedule-DeleteOnReboot -filePath $edgeCachePath
         }
     } else {
-        Write-Host "Cache directory not found: $edgeCachePath"
+        Write-Host "Cache directory not found: $edgeCachePath" -ForegroundColor Yellow
     }
 
     # Remove saved favorites (Bookmarks)
@@ -123,7 +128,7 @@ function Clear-EdgeData {
             Schedule-DeleteOnReboot -filePath $edgeFavoritesPath
         }
     } else {
-        Write-Host "Favorites (Bookmarks) file not found: $edgeFavoritesPath"
+        Write-Host "Favorites (Bookmarks) file not found: $edgeFavoritesPath" -ForegroundColor Yellow
     }
 
     # Remove Edge session data to prevent session restoration
@@ -136,7 +141,7 @@ function Clear-EdgeData {
             Schedule-DeleteOnReboot -filePath $edgeSessionPath
         }
     } else {
-        Write-Host "Session data not found: $edgeSessionPath"
+        Write-Host "Session data not found: $edgeSessionPath" -ForegroundColor Yellow
     }
 }
 
@@ -146,7 +151,7 @@ function Clear-OldUserFiles {
         [int]$daysOld = 30
     )
 
-    Write-Host "Clearing user files older than $daysOld days..."
+    Write-Host "Clearing user files older than $daysOld days..." -ForegroundColor Cyan
 
     # Get the original user's profile path
     $userProfilePath = Get-OriginalUserProfile
@@ -157,6 +162,7 @@ function Clear-OldUserFiles {
 
     foreach ($folder in $foldersToClean) {
         $userFolder = "$userProfilePath\$folder"
+        Write-Host "Cleaning folder: $userFolder" -ForegroundColor Cyan
         if (Test-Path $userFolder) {
             Get-ChildItem -Path $userFolder -Recurse | Where-Object {
                 $_.LastWriteTime -lt $cutoffDate
@@ -173,12 +179,12 @@ function Clear-OldUserFiles {
         }
     }
 
-    Write-Host "Old user files cleared."
+    Write-Host "Old user files cleared." -ForegroundColor Green
 }
 
 # Function to empty the Recycle Bin
 function Empty-RecycleBin {
-    Write-Host "Emptying the Recycle Bin..."
+    Write-Host "Emptying the Recycle Bin..." -ForegroundColor Cyan
     try {
         Clear-RecycleBin -Force
         Write-Host "Recycle Bin emptied." -ForegroundColor Green
@@ -189,7 +195,7 @@ function Empty-RecycleBin {
 
 # Function to install Windows updates
 function Install-WindowsUpdates {
-    Write-Host "Installing Windows updates..."
+    Write-Host "Installing Windows updates..." -ForegroundColor Cyan
     try {
         Import-Module PSWindowsUpdate -ErrorAction Stop
         Get-WindowsUpdate -MicrosoftUpdate -AcceptAll -Install -AutoReboot
@@ -200,27 +206,22 @@ function Install-WindowsUpdates {
 }
 
 # Main script logic
-# Ensure the script is being run as an administrator
-Check-Administrator
+Check-Administrator  # Ensure the script is being run as an administrator
 
-# Clear Microsoft Edge data for the original user (the one who ran the script)
-Clear-EdgeData
+Clear-EdgeData  # Clear Microsoft Edge data for the original user (the one who ran the script)
 
-# Delete old files from Downloads, Documents, and Desktop for the original user
-Clear-OldUserFiles -daysOld 30
+Clear-OldUserFiles -daysOld 30  # Delete old files from Downloads, Documents, and Desktop for the original user
 
-# Optionally, empty the Recycle Bin
-Empty-RecycleBin
+Empty-RecycleBin  # Empty the Recycle Bin
 
-# Optionally, install Windows updates
-Install-WindowsUpdates
+Install-WindowsUpdates  # Install Windows updates
 
-Write-Host "Script completed successfully."
+Write-Host "Script completed successfully." -ForegroundColor Cyan
 
 # Add a 10-second pause before reboot
-Write-Host "The system will restart in 10 seconds..."
+Write-Host "The system will restart in 10 seconds..." -ForegroundColor Cyan
 Start-Sleep -Seconds 10
 
 # Add a forced reboot
-Write-Host "Forcing system reboot..."
+Write-Host "Forcing system reboot..." -ForegroundColor Cyan
 Restart-Computer -Force
