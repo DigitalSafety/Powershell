@@ -123,13 +123,6 @@ function Clear-EdgeData {
     }
 }
 
-# Main script execution
-#Check-Administrator
-
-# Clear Microsoft Edge data immediately after admin check
-#Clear-EdgeData
-
-
 # Function to remove non-essential programs installed in the last 30 days
 function Remove-NewPrograms {
     param (
@@ -137,9 +130,6 @@ function Remove-NewPrograms {
     )
 
     Write-Host "Removing non-essential programs installed in the last $daysAgo days..."
-
-    # Get the full path of the script to avoid deleting it
-    $scriptPath = "C:\Program Files\CourseCleanup\CourseCleanUp.ps1"
 
     # Get the cutoff date for the past X days
     $cutoffDate = (Get-Date).AddDays(-$daysAgo)
@@ -152,9 +142,9 @@ function Remove-NewPrograms {
 
     foreach ($path in $programPaths) {
         Get-ChildItem -Path $path -Directory | ForEach-Object {
-            # Skip the directory if it contains CourseCleanUp.ps1
-            if ($_.FullName -eq "C:\Program Files" -and (Test-Path $scriptPath)) {
-                Write-Host "Skipping: $($_.FullName) because it contains CourseCleanUp.ps1" -ForegroundColor Yellow
+            # Skip the CourseCleanup directory entirely, not just the file
+            if ($_.FullName -eq "C:\Program Files\CourseCleanup") {
+                Write-Host "Skipping: $($_.FullName) as it contains CourseCleanUp.ps1 and should remain." -ForegroundColor Yellow
             } elseif ($_.LastWriteTime -gt $cutoffDate) {
                 try {
                     # Try to remove the directory, ignoring protected and in-use ones
@@ -169,7 +159,6 @@ function Remove-NewPrograms {
 
     Write-Host "Program removal completed."
 }
-
 
 # Function to clear old user files older than 30 days
 function Clear-OldUserFiles {
@@ -206,9 +195,6 @@ function Clear-OldUserFiles {
     Write-Host "Old user files cleared."
 }
 
-
-
-
 # Function to empty the Recycle Bin
 function Empty-RecycleBin {
     Write-Host "Emptying the Recycle Bin..."
@@ -233,9 +219,7 @@ function Install-WindowsUpdates {
 }
 
 # Main script logic
-# Main script execution
 Check-Administrator
-# Clear Microsoft Edge data immediately after admin check
 Clear-EdgeData
 Remove-NewPrograms -daysAgo 30
 Clear-OldUserFiles -daysOld 30
