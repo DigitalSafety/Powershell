@@ -8,6 +8,128 @@ function Check-Administrator {
     }
 }
 
+# Function to stop all Edge and related services
+function Close-EdgeProcesses {
+    Write-Host "Closing Microsoft Edge and related processes..."
+    
+    # Stop all Edge and Edge-related processes (including msedgewebview2)
+    $edgeProcesses = Get-Process | Where-Object {
+        $_.ProcessName -like "*msedge*" -or $_.ProcessName -like "*edge*" -or $_.ProcessName -like "*msedgewebview2*"
+    }
+
+    foreach ($process in $edgeProcesses) {
+        try {
+            Write-Host "Stopping process: $($process.ProcessName) (ID: $($process.Id))"
+            Stop-Process -Id $process.Id -Force
+        } catch {
+            Write-Host "Failed to stop process: $($process.ProcessName)" -ForegroundColor Red
+        }
+    }
+
+    # Wait to ensure processes have been fully terminated
+    Start-Sleep -Seconds 10
+}
+
+# Function to schedule file deletion on reboot using MoveFileEx
+function Schedule-DeleteOnReboot {
+    param (
+        [string]$filePath
+    )
+    
+    Write-Host "Scheduling deletion of $filePath on reboot..."
+
+    try {
+        $signature = @"
+        [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Auto)]
+        public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
+"@
+        Add-Type -MemberDefinition $signature -Name "MoveFileEx" -Namespace "Win32"
+        $result = [Win32.MoveFileEx]::MoveFileEx($filePath, $null, 4)  # 4 == MOVEFILE_DELAY_UNTIL_REBOOT
+
+        if ($result) {
+            Write-Host "Scheduled for deletion on reboot: $filePath" -ForegroundColor Green
+        } else {
+            $errorMessage = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            Write-Host "Failed to schedule deletion: Error code $errorMessage" -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "Failed to schedule deletion for: $filePath" -ForegroundColor Red
+    }
+}
+
+# Function to clear Microsoft Edge history, cache, session, and favorites
+function Clear-EdgeData {
+    Write-Host "Clearing Microsoft Edge history, cache, session files, and favorites..."
+
+    $edgeUserDataPath = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default"
+    $edgeHistoryPath = "$edgeUserDataPath\History"
+    $edgeCachePath = "$edgeUserDataPath\Cache"
+    $edgeFavoritesPath = "$edgeUserDataPath\Bookmarks"
+    $edgeSessionPath = "$edgeUserDataPath\Sessions"
+
+    # Ensure Edge processes are closed before deleting files
+    Close-EdgeProcesses
+
+    # Remove Edge history file
+    if (Test-Path -Path $edgeHistoryPath) {
+        try {
+            Remove-Item -Path $edgeHistoryPath -Force
+            Write-Host "Cleared: $edgeHistoryPath" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to clear history: File is locked. Scheduling for deletion on reboot." -ForegroundColor Red
+            Schedule-DeleteOnReboot -filePath $edgeHistoryPath
+        }
+    } else {
+        Write-Host "History file not found: $edgeHistoryPath"
+    }
+
+    # Remove Edge cache
+    if (Test-Path -Path $edgeCachePath) {
+        try {
+            Remove-Item -Path $edgeCachePath -Recurse -Force
+            Write-Host "Cleared: $edgeCachePath" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to clear cache: File is locked. Scheduling for deletion on reboot." -ForegroundColor Red
+            Schedule-DeleteOnReboot -filePath $edgeCachePath
+        }
+    } else {
+        Write-Host "Cache directory not found: $edgeCachePath"
+    }
+
+    # Remove saved favorites (Bookmarks)
+    if (Test-Path -Path $edgeFavoritesPath) {
+        try {
+            Remove-Item -Path $edgeFavoritesPath -Force
+            Write-Host "Cleared saved favorites: $edgeFavoritesPath" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to clear favorites: File is locked. Scheduling for deletion on reboot." -ForegroundColor Red
+            Schedule-DeleteOnReboot -filePath $edgeFavoritesPath
+        }
+    } else {
+        Write-Host "Favorites (Bookmarks) file not found: $edgeFavoritesPath"
+    }
+
+    # Remove Edge session data to prevent session restoration
+    if (Test-Path -Path $edgeSessionPath) {
+        try {
+            Remove-Item -Path $edgeSessionPath -Recurse -Force
+            Write-Host "Cleared session data: $edgeSessionPath" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to clear session data: Files are locked. Scheduling for deletion on reboot." -ForegroundColor Red
+            Schedule-DeleteOnReboot -filePath $edgeSessionPath
+        }
+    } else {
+        Write-Host "Session data not found: $edgeSessionPath"
+    }
+}
+
+# Main script execution
+#Check-Administrator
+
+# Clear Microsoft Edge data immediately after admin check
+#Clear-EdgeData
+
+
 # Function to remove non-essential programs installed in the last 30 days
 function Remove-NewPrograms {
     param (
@@ -81,43 +203,7 @@ function Clear-OldUserFiles {
     Write-Host "Old user files cleared."
 }
 
-# Function to reset Microsoft Edge data for all users
-function Reset-EdgeData {
-    Write-Host "Resetting Microsoft Edge data for all users..."
 
-    # Ensure Edge is not running
-    $edgeProcesses = Get-Process -Name "msedge" -ErrorAction SilentlyContinue
-    if ($edgeProcesses) {
-        Write-Host "Stopping Microsoft Edge processes..."
-        Stop-Process -Name "msedge" -Force
-        Write-Host "Microsoft Edge processes stopped."
-    }
-
-    Get-ChildItem "C:\Users" | ForEach-Object {
-        $userProfile = $_.FullName
-        $edgeDataPath = "$userProfile\AppData\Local\Microsoft\Edge\User Data\Default"
-
-        if (Test-Path $edgeDataPath) {
-            $filesToClear = @("History", "Cache", "Cookies", "Top Sites", "Preferences", "Visited Links", "Sessions")
-
-            foreach ($file in $filesToClear) {
-                $filePath = "$edgeDataPath\$file"
-                if (Test-Path $filePath) {
-                    try {
-                        Remove-Item -Recurse -Force -Path $filePath -ErrorAction Stop
-                        Write-Host "Cleared: $filePath" -ForegroundColor Green
-                    } catch {
-                        Write-Host "Failed to clear: $filePath. File may be locked or in use." -ForegroundColor Red
-                    }
-                } else {
-                    Write-Host "Path not found: $filePath" -ForegroundColor Yellow
-                }
-            }
-        }
-    }
-
-    Write-Host "Microsoft Edge reset completed."
-}
 
 # Function to empty the Recycle Bin
 function Empty-RecycleBin {
@@ -143,11 +229,21 @@ function Install-WindowsUpdates {
 }
 
 # Main script logic
+# Main script execution
 Check-Administrator
+# Clear Microsoft Edge data immediately after admin check
+Clear-EdgeData
 Remove-NewPrograms -daysAgo 30
 Clear-OldUserFiles -daysOld 30
-Reset-EdgeData
 Empty-RecycleBin
 Install-WindowsUpdates
 
 Write-Host "Script completed successfully."
+
+# Add a 10-second pause before reboot
+Write-Host "The system will restart in 10 seconds..."
+Start-Sleep -Seconds 10
+
+# Add a forced reboot
+Write-Host "Forcing system reboot..."
+Restart-Computer -Force
